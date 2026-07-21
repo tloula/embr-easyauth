@@ -28,7 +28,7 @@ def root(request: Request) -> HTMLResponse:
         f'<th scope="row">{escape(name)}</th><td>{escape(value)}</td></tr>'
         for name, value in headers
     )
-    client = request.client.host if request.client else "unknown"
+    azure_socket_ip = request.headers.get("x-azure-socketip", "not present")
     identity_status = (
         f"{easyauth_count} EasyAuth-related header"
         f'{"s" if easyauth_count != 1 else ""} detected'
@@ -187,7 +187,7 @@ def root(request: Request) -> HTMLResponse:
     <section class="summary" aria-label="Request summary">
       <div class="stat"><span class="stat-label">Method</span><span class="stat-value">{escape(request.method)}</span></div>
       <div class="stat"><span class="stat-label">Path</span><span class="stat-value">{escape(request.url.path)}</span></div>
-      <div class="stat"><span class="stat-label">Client</span><span class="stat-value">{escape(client)}</span></div>
+      <div class="stat"><span class="stat-label">X-Azure-SocketIP</span><span class="stat-value">{escape(azure_socket_ip)}</span></div>
       <div class="stat"><span class="stat-label">Headers</span><span class="stat-value">{len(headers)}</span></div>
     </section>
 

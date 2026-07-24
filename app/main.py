@@ -182,8 +182,6 @@ def root(request: Request) -> HTMLResponse:
     <h1>EasyAuth request inspector</h1>
     <p class="intro">This page shows the complete request envelope delivered to the app. EasyAuth-related headers are highlighted so injected identity is easy to verify.</p>
 
-    <div class="warning"><strong>Test only.</strong> Every header is displayed without redaction, including cookies and credentials. Do not deploy this app to production or expose it to real user traffic.</div>
-
     <section class="summary" aria-label="Request summary">
       <div class="stat"><span class="stat-label">Method</span><span class="stat-value">{escape(request.method)}</span></div>
       <div class="stat"><span class="stat-label">Path</span><span class="stat-value">{escape(request.url.path)}</span></div>

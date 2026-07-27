@@ -14,13 +14,13 @@ uv sync
 uv run uvicorn app.main:app --port 8000
 ```
 
-Open http://localhost:8000 to inspect every header received by the app in a browser. EasyAuth-related identity headers are highlighted for quick verification. Use `/headers` when a raw JSON response is more convenient for automation.
+Open http://localhost:8000 to inspect every header received by the app in a browser. EasyAuth-related identity headers are highlighted for quick verification, and the page fetches `/.auth/me` client-side to render the signed-in identity, its provider, and a formatted claims table (with the raw JSON available in a collapsible section). When EasyAuth is not enabled or the caller is unauthenticated, that panel reports the failing status instead. Use `/headers` when a raw JSON response is more convenient for automation.
 
 ## Routes
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/` | HTML request inspector showing request metadata and all received headers |
+| GET | `/` | HTML request inspector showing request metadata, `/.auth/me` identity, and all received headers |
 | GET/POST/PUT/DELETE | `/headers` | Echoes request method, path, all headers, and client host as JSON |
 | GET | `/health` | Liveness probe (`{"status":"ok"}`) |
 

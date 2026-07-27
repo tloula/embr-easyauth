@@ -143,6 +143,29 @@ def root(request: Request) -> HTMLResponse:
       font-size: 0.75rem;
       font-weight: 800;
     }}
+    .panel + .panel {{ margin-top: 24px; }}
+    .panel-body {{ padding: 18px 20px; }}
+    .identity-card + .identity-card {{ margin-top: 18px; border-top: 1px solid var(--line); padding-top: 18px; }}
+    .identity-meta {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }}
+    .claim-type {{ color: var(--muted); font-weight: 700; }}
+    .claim-type small {{ display: block; font-weight: 400; font-size: 0.72rem; opacity: 0.75; }}
+    .empty {{ margin: 0; color: var(--muted); }}
+    details.raw {{ margin-top: 16px; }}
+    details.raw summary {{ cursor: pointer; color: var(--azure); font-weight: 700; font-size: 0.8rem; }}
+    details.raw pre {{
+      overflow-x: auto;
+      margin: 10px 0 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--paper);
+      padding: 12px 14px;
+      font-size: 0.78rem;
+    }}
     .table-wrap {{ overflow-x: auto; }}
     table {{ width: 100%; border-collapse: collapse; font-size: 0.84rem; }}
     th, td {{
@@ -180,13 +203,23 @@ def root(request: Request) -> HTMLResponse:
   <main>
     <div class="eyebrow">Embr diagnostic app</div>
     <h1>EasyAuth request inspector</h1>
-    <p class="intro">This page shows the complete request envelope delivered to the app. EasyAuth-related headers are highlighted so injected identity is easy to verify.</p>
+    <p class="intro">This page shows the complete request envelope delivered to the app. EasyAuth-related headers are highlighted so injected identity is easy to verify, and the browser calls <code>/.auth/me</code> to render the signed-in principal and its claims.</p>
 
     <section class="summary" aria-label="Request summary">
       <div class="stat"><span class="stat-label">Method</span><span class="stat-value">{escape(request.method)}</span></div>
       <div class="stat"><span class="stat-label">Path</span><span class="stat-value">{escape(request.url.path)}</span></div>
       <div class="stat"><span class="stat-label">X-Azure-SocketIP</span><span class="stat-value">{escape(azure_socket_ip)}</span></div>
       <div class="stat"><span class="stat-label">Headers</span><span class="stat-value">{len(headers)}</span></div>
+    </section>
+
+    <section class="panel" id="auth-panel">
+      <div class="panel-heading">
+        <h2>EasyAuth identity (<code>/.auth/me</code>)</h2>
+        <span class="status" id="auth-status">Loading&hellip;</span>
+      </div>
+      <div class="panel-body" id="auth-body">
+        <p class="empty">Fetching <code>/.auth/me</code>&hellip;</p>
+      </div>
     </section>
 
     <section class="panel">
@@ -206,6 +239,129 @@ def root(request: Request) -> HTMLResponse:
       <a href="/headers">View raw JSON</a>
     </div>
   </main>
+  <script>
+  (function () {{
+    var statusEl = document.getElementById('auth-status');
+    var bodyEl = document.getElementById('auth-body');
+
+    function el(tag, text) {{
+      var node = document.createElement(tag);
+      if (text !== undefined && text !== null) {{ node.textContent = String(text); }}
+      return node;
+    }}
+
+    function setStatus(text) {{ statusEl.textContent = text; }}
+
+    function shortClaim(type) {{
+      var parts = String(type).split('/');
+      return parts[parts.length - 1] || type;
+    }}
+
+    function stat(label, value) {{
+      var wrap = el('div');
+      wrap.className = 'stat';
+      var l = el('span', label);
+      l.className = 'stat-label';
+      var v = el('span', value === undefined || value === null || value === '' ? '—' : value);
+      v.className = 'stat-value';
+      wrap.appendChild(l);
+      wrap.appendChild(v);
+      return wrap;
+    }}
+
+    function claimsTable(claims) {{
+      var wrap = el('div');
+      wrap.className = 'table-wrap';
+      var table = el('table');
+      var tbody = el('tbody');
+      claims.forEach(function (claim) {{
+        var tr = el('tr');
+        var th = el('th');
+        th.className = 'claim-type';
+        th.setAttribute('scope', 'row');
+        th.appendChild(el('span', shortClaim(claim.typ)));
+        if (shortClaim(claim.typ) !== claim.typ) {{ th.appendChild(el('small', claim.typ)); }}
+        tr.appendChild(th);
+        tr.appendChild(el('td', claim.val));
+        tbody.appendChild(tr);
+      }});
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+      return wrap;
+    }}
+
+    function render(identities) {{
+      bodyEl.textContent = '';
+      if (!Array.isArray(identities) || identities.length === 0) {{
+        setStatus('Not authenticated');
+        var none = el('p', 'No identity returned by /.auth/me.');
+        none.className = 'empty';
+        bodyEl.appendChild(none);
+        return;
+      }}
+      setStatus(identities.length + ' identit' + (identities.length === 1 ? 'y' : 'ies'));
+      identities.forEach(function (identity) {{
+        var card = el('section');
+        card.className = 'identity-card';
+        var meta = el('div');
+        meta.className = 'identity-meta';
+        meta.appendChild(stat('Provider', identity.provider_name));
+        meta.appendChild(stat('User ID', identity.user_id));
+        if (identity.expires_on) {{ meta.appendChild(stat('Expires on', identity.expires_on)); }}
+        var claims = identity.user_claims || [];
+        meta.appendChild(stat('Claims', claims.length));
+        card.appendChild(meta);
+        if (claims.length) {{
+          card.appendChild(claimsTable(claims));
+        }} else {{
+          var none = el('p', 'No claims present.');
+          none.className = 'empty';
+          card.appendChild(none);
+        }}
+        bodyEl.appendChild(card);
+      }});
+
+      var raw = el('details');
+      raw.className = 'raw';
+      raw.appendChild(el('summary', 'View raw /.auth/me JSON'));
+      raw.appendChild(el('pre', JSON.stringify(identities, null, 2)));
+      bodyEl.appendChild(raw);
+    }}
+
+    function fail(message, showLogin) {{
+      setStatus('Unavailable');
+      bodyEl.textContent = '';
+      var p = el('p', message);
+      p.className = 'empty';
+      bodyEl.appendChild(p);
+      if (showLogin) {{
+        var link = el('a', 'Sign in with /.auth/login/aad');
+        link.href = '/.auth/login/aad';
+        bodyEl.appendChild(link);
+      }}
+    }}
+
+    fetch('/.auth/me', {{ credentials: 'include', headers: {{ Accept: 'application/json' }} }})
+      .then(function (response) {{
+        if (response.status === 401 || response.status === 403) {{
+          fail('Not authenticated (HTTP ' + response.status + ').', true);
+          return null;
+        }}
+        if (!response.ok) {{
+          fail('/.auth/me returned HTTP ' + response.status + '. EasyAuth may not be enabled for this app.', false);
+          return null;
+        }}
+        return response.json();
+      }})
+      .then(function (data) {{
+        if (data === null) {{ return; }}
+        render(data);
+      }})
+      .catch(function (error) {{
+        fail('Failed to fetch /.auth/me: ' + error.message, false);
+      }});
+  }})();
+  </script>
 </body>
 </html>"""
     return HTMLResponse(html)

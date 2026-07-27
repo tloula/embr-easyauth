@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 from html import escape
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -17,6 +21,99 @@ _EASYAUTH_HEADER_PREFIXES = (
 )
 
 
+def decode_client_principal(raw: str | None) -> tuple[dict[str, Any] | None, str | None]:
+    """Decode the base64 JSON payload of an x-ms-client-principal header.
+
+    Returns (payload, error). Exactly one of the two is set when ``raw`` is present.
+    """
+    if not raw:
+        return None, None
+    normalized = raw.strip().replace("-", "+").replace("_", "/")
+    normalized += "=" * (-len(normalized) % 4)
+    try:
+        decoded = base64.b64decode(normalized).decode("utf-8")
+    except (binascii.Error, ValueError, UnicodeDecodeError) as exc:
+        return None, f"Header is not valid base64-encoded UTF-8: {exc}"
+    try:
+        payload = json.loads(decoded)
+    except json.JSONDecodeError as exc:
+        return None, f"Decoded header is not valid JSON: {exc}"
+    if not isinstance(payload, dict):
+        return None, "Decoded header is not a JSON object."
+    return payload, None
+
+
+def _short_claim_type(claim_type: str) -> str:
+    return claim_type.rsplit("/", 1)[-1] or claim_type
+
+
+def _stat(label: str, value: object) -> str:
+    text = "\u2014" if value in (None, "", []) else str(value)
+    return (
+        '<div class="stat">'
+        f'<span class="stat-label">{escape(label)}</span>'
+        f'<span class="stat-value">{escape(text)}</span>'
+        "</div>"
+    )
+
+
+def _render_client_principal(raw: str | None) -> tuple[str, str]:
+    """Return (status badge text, panel body HTML) for the decoded principal panel."""
+    payload, error = decode_client_principal(raw)
+    if raw is None:
+        return "Header not present", (
+            '<p class="empty">No <code>x-ms-client-principal</code> header was sent with this '
+            "request.</p>"
+        )
+    if error is not None:
+        return "Decode failed", f'<p class="empty">{escape(error)}</p>'
+
+    assert payload is not None
+    claims_raw = payload.get("claims")
+    claims = [c for c in claims_raw if isinstance(c, dict)] if isinstance(claims_raw, list) else []
+    name_typ = payload.get("name_typ")
+    role_typ = payload.get("role_typ")
+    display_name = next(
+        (str(c.get("val", "")) for c in claims if c.get("typ") == name_typ),
+        None,
+    )
+    roles = [str(c.get("val", "")) for c in claims if c.get("typ") == role_typ]
+
+    meta = "".join(
+        (
+            _stat("Auth type", payload.get("auth_typ")),
+            _stat("Name", display_name),
+            _stat("Roles", ", ".join(roles) if roles else None),
+            _stat("Claims", len(claims)),
+        )
+    )
+
+    if claims:
+        claim_rows = "".join(
+            '<tr><th scope="row" class="claim-type">'
+            f"<span>{escape(_short_claim_type(str(claim.get('typ', ''))))}</span>"
+            + (
+                f"<small>{escape(str(claim.get('typ', '')))}</small>"
+                if _short_claim_type(str(claim.get("typ", ""))) != str(claim.get("typ", ""))
+                else ""
+            )
+            + f"</th><td>{escape(str(claim.get('val', '')))}</td></tr>"
+            for claim in claims
+        )
+        claims_html = f'<div class="table-wrap"><table><tbody>{claim_rows}</tbody></table></div>'
+    else:
+        claims_html = '<p class="empty">Decoded payload contains no claims.</p>'
+
+    raw_json = escape(json.dumps(payload, indent=2, sort_keys=True))
+    body = (
+        f'<div class="identity-meta">{meta}</div>'
+        f"{claims_html}"
+        '<details class="raw"><summary>View decoded JSON</summary>'
+        f"<pre>{raw_json}</pre></details>"
+    )
+    return "Decoded", body
+
+
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request) -> HTMLResponse:
     headers = sorted(request.headers.items(), key=lambda item: item[0].lower())
@@ -29,6 +126,9 @@ def root(request: Request) -> HTMLResponse:
         for name, value in headers
     )
     azure_socket_ip = request.headers.get("x-azure-socketip", "not present")
+    principal_status, principal_body = _render_client_principal(
+        request.headers.get("x-ms-client-principal")
+    )
     identity_status = (
         f"{easyauth_count} EasyAuth-related header"
         f'{"s" if easyauth_count != 1 else ""} detected'
@@ -212,6 +312,14 @@ def root(request: Request) -> HTMLResponse:
       <div class="stat"><span class="stat-label">Headers</span><span class="stat-value">{len(headers)}</span></div>
     </section>
 
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>Decoded <code>x-ms-client-principal</code></h2>
+        <span class="status">{principal_status}</span>
+      </div>
+      <div class="panel-body">{principal_body}</div>
+    </section>
+
     <section class="panel" id="auth-panel">
       <div class="panel-heading">
         <h2>EasyAuth identity (<code>/.auth/me</code>)</h2>
@@ -369,12 +477,17 @@ def root(request: Request) -> HTMLResponse:
 
 @app.api_route("/headers", methods=["GET", "POST", "PUT", "DELETE"])
 def echo_headers(request: Request) -> JSONResponse:
+    principal, principal_error = decode_client_principal(
+        request.headers.get("x-ms-client-principal")
+    )
     return JSONResponse(
         {
             "method": request.method,
             "path": request.url.path,
             "headers": dict(request.headers),
             "client": request.client.host if request.client else None,
+            "client_principal": principal,
+            "client_principal_error": principal_error,
         }
     )
 

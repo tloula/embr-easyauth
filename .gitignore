@@ -7,6 +7,10 @@ __pycache__/
 # Env
 .env
 
+# Azure Functions
+dist/
+functionapp/.python_packages/
+
 # Editor / OS
 .vscode/
 .idea/

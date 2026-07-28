@@ -2,6 +2,13 @@
 
 A deliberately minimal, **test-only** Python FastAPI app that echoes incoming request headers. It exists to verify that the Embr YARP proxy strips spoofable EasyAuth and forwarding headers before requests reach an app.
 
+The same app ships in two flavours that share one code base:
+
+| Flavour | Entry point | Notes |
+| --- | --- | --- |
+| Embr / container | [app/main.py](app/main.py) | Run by [embr.yaml](embr.yaml) and the root [Dockerfile](Dockerfile) via uvicorn |
+| Azure Functions | [functionapp/function_app.py](functionapp/function_app.py) | Hosts the identical FastAPI app through `azure.functions.AsgiFunctionApp` |
+
 ## Stack
 
 - [uv](https://docs.astral.sh/uv/) for project & dependency management
@@ -23,6 +30,54 @@ Open http://localhost:8000 to inspect every header received by the app in a brow
 | GET | `/` | HTML request inspector showing request metadata, the decoded `x-ms-client-principal`, `/.auth/me` identity, and all received headers |
 | GET/POST/PUT/DELETE | `/headers` | Echoes request method, path, all headers, client host, and the decoded `x-ms-client-principal` as JSON |
 | GET | `/health` | Liveness probe (`{"status":"ok"}`) |
+
+Both flavours expose the same routes. The Functions host sets `routePrefix` to `""` in [functionapp/host.json](functionapp/host.json), so there is no `/api` prefix and the paths match the Embr deployment exactly.
+
+## Azure Functions flavour
+
+[functionapp/function_app.py](functionapp/function_app.py) is a thin ASGI host — it imports the FastAPI app from `app/main.py` rather than reimplementing anything, so behaviour cannot drift between the two deployments. All HTTP triggers are anonymous, which lets platform EasyAuth own authentication.
+
+### Run locally
+
+Requires [Azure Functions Core Tools v4](https://learn.microsoft.com/azure/azure-functions/functions-run-local).
+
+```sh
+cd functionapp
+pip install -r requirements.txt
+func start
+```
+
+`function_app.py` appends the repo root to `sys.path`, so the shared `app` package resolves straight from a clone with no copy step.
+
+### Deploy as a container
+
+Build from the repo root so the shared `app` package is in the build context:
+
+```sh
+docker build -f functionapp/Dockerfile -t embr-easyauth-func .
+```
+
+### Deploy as a zip (manual push)
+
+`func` only packages its own project folder, so the shared `app` package is staged alongside the Functions files. `host.json` must sit at the zip root:
+
+```powershell
+$stage = Join-Path $env:TEMP "embr-func-stage"
+Remove-Item -Recurse -Force $stage -EA SilentlyContinue
+New-Item -ItemType Directory -Path $stage | Out-Null
+Copy-Item functionapp\function_app.py, functionapp\host.json, functionapp\requirements.txt $stage
+Copy-Item -Recurse app "$stage\app"
+New-Item -ItemType Directory -Force dist | Out-Null
+Compress-Archive -Path "$stage\*" -DestinationPath dist\functionapp.zip -Force
+```
+
+Push it to the `embr-easyauth` function app (Flex Consumption, Python 3.14, resource group `easyauth`):
+
+```sh
+az functionapp deployment source config-zip --subscription e2161017-4eef-4198-ab67-10f3e7a868b2 --resource-group easyauth --name embr-easyauth --src dist/functionapp.zip
+```
+
+Flex Consumption always remote-builds from `requirements.txt`, so no `SCM_DO_BUILD_DURING_DEPLOYMENT` setting is needed. The deployed app is served from https://embr-easyauth-bsbnhta7cyemfzes.canadacentral-01.azurewebsites.net.
 
 ## ⚠ Security warning
 

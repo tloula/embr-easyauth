@@ -1,0 +1,4 @@
+# Keep in sync with the runtime dependencies in ../pyproject.toml.
+# uvicorn is not needed here: the Functions host provides the ASGI server.
+azure-functions>=1.21,<2
+fastapi>=0.115,<0.116

@@ -186,17 +186,30 @@ def root(request: Request) -> HTMLResponse:
       line-height: 0.98;
     }}
     .intro {{ max-width: 720px; margin: 0; color: var(--muted); font-size: 1.05rem; }}
-    .logout {{
+    .auth-actions {{
       flex: none;
+      display: flex;
+    }}
+    .auth-actions[hidden] {{ display: none; }}
+    .auth-button {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       border: 1px solid var(--line);
-      border-radius: 8px;
       background: var(--white);
       padding: 8px 13px;
       color: var(--ink);
       text-decoration: none;
       box-shadow: 0 8px 20px rgb(20 33 61 / 6%);
     }}
-    .logout:hover {{ border-color: var(--azure); color: var(--azure); }}
+    .auth-button:hover {{ border-color: var(--azure); color: var(--azure); }}
+    .auth-button svg {{ width: 18px; height: 18px; flex: none; }}
+    .login-options .auth-button:first-child {{ border-radius: 8px 0 0 8px; }}
+    .login-options .auth-button:last-child {{
+      margin-left: -1px;
+      border-radius: 0 8px 8px 0;
+    }}
+    .logout {{ border-radius: 8px; }}
     .warning {{
       margin: 28px 0;
       border: 1px solid #efb43f;
@@ -325,7 +338,19 @@ def root(request: Request) -> HTMLResponse:
         <h1>EasyAuth request inspector</h1>
         <p class="intro">This page shows the complete request envelope delivered to the app. EasyAuth-related headers are highlighted so injected identity is easy to verify, and the browser calls <code>/.auth/me</code> to render the signed-in principal and its claims.</p>
       </div>
-      <a class="logout" href="/.auth/logout">Log out</a>
+      <nav class="auth-actions login-options" id="login-actions" aria-label="Sign in options" hidden>
+        <a class="auth-button" href="/.auth/login/github">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.6.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C16.9 4.8 18 5.1 18 5.1c.6 1.5.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.8 5.4-5.5 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .7Z"/></svg>
+          GitHub
+        </a>
+        <a class="auth-button" href="/.auth/login/entra">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M13 1h10v10H13z"/><path fill="#05a6f0" d="M1 13h10v10H1z"/><path fill="#ffba08" d="M13 13h10v10H13z"/></svg>
+          Microsoft Entra
+        </a>
+      </nav>
+      <div class="auth-actions" id="logout-actions" hidden>
+        <a class="auth-button logout" href="/.auth/logout">Log out</a>
+      </div>
     </header>
 
     <section class="summary" aria-label="Request summary">
@@ -374,6 +399,8 @@ def root(request: Request) -> HTMLResponse:
   (function () {{
     var statusEl = document.getElementById('auth-status');
     var bodyEl = document.getElementById('auth-body');
+    var loginActions = document.getElementById('login-actions');
+    var logoutActions = document.getElementById('logout-actions');
 
     function el(tag, text) {{
       var node = document.createElement(tag);
@@ -382,6 +409,11 @@ def root(request: Request) -> HTMLResponse:
     }}
 
     function setStatus(text) {{ statusEl.textContent = text; }}
+
+    function showAuthActions(isAuthenticated) {{
+      loginActions.hidden = isAuthenticated;
+      logoutActions.hidden = !isAuthenticated;
+    }}
 
     function shortClaim(type) {{
       var parts = String(type).split('/');
@@ -425,11 +457,13 @@ def root(request: Request) -> HTMLResponse:
       bodyEl.textContent = '';
       if (!Array.isArray(identities) || identities.length === 0) {{
         setStatus('Not authenticated');
+        showAuthActions(false);
         var none = el('p', 'No identity returned by /.auth/me.');
         none.className = 'empty';
         bodyEl.appendChild(none);
         return;
       }}
+      showAuthActions(true);
       setStatus(identities.length + ' identit' + (identities.length === 1 ? 'y' : 'ies'));
       identities.forEach(function (identity) {{
         var card = el('section');
@@ -459,17 +493,13 @@ def root(request: Request) -> HTMLResponse:
       bodyEl.appendChild(raw);
     }}
 
-    function fail(message, showLogin) {{
+    function fail(message, isLoggedOut) {{
       setStatus('Unavailable');
       bodyEl.textContent = '';
       var p = el('p', message);
       p.className = 'empty';
       bodyEl.appendChild(p);
-      if (showLogin) {{
-        var link = el('a', 'Sign in with /.auth/login/aad');
-        link.href = '/.auth/login/aad';
-        bodyEl.appendChild(link);
-      }}
+      if (isLoggedOut) {{ showAuthActions(false); }}
     }}
 
     fetch('/.auth/me', {{ credentials: 'include', headers: {{ Accept: 'application/json' }} }})

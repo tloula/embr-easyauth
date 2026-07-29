@@ -165,6 +165,12 @@ def root(request: Request) -> HTMLResponse:
       line-height: 1.5;
     }}
     main {{ width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0; }}
+    .page-header {{
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+    }}
     .eyebrow {{
       color: var(--azure);
       font-size: 0.75rem;
@@ -180,6 +186,17 @@ def root(request: Request) -> HTMLResponse:
       line-height: 0.98;
     }}
     .intro {{ max-width: 720px; margin: 0; color: var(--muted); font-size: 1.05rem; }}
+    .logout {{
+      flex: none;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--white);
+      padding: 8px 13px;
+      color: var(--ink);
+      text-decoration: none;
+      box-shadow: 0 8px 20px rgb(20 33 61 / 6%);
+    }}
+    .logout:hover {{ border-color: var(--azure); color: var(--azure); }}
     .warning {{
       margin: 28px 0;
       border: 1px solid #efb43f;
@@ -291,6 +308,7 @@ def root(request: Request) -> HTMLResponse:
     a {{ color: var(--azure); font-weight: 700; }}
     @media (max-width: 760px) {{
       main {{ padding: 28px 0; }}
+      .page-header {{ flex-direction: column; }}
       .summary {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
       .panel-heading, .footer {{ align-items: flex-start; flex-direction: column; }}
       th, td {{ display: block; width: 100%; padding: 8px 14px; }}
@@ -301,9 +319,14 @@ def root(request: Request) -> HTMLResponse:
 </head>
 <body>
   <main>
-    <div class="eyebrow">Embr diagnostic app</div>
-    <h1>EasyAuth request inspector</h1>
-    <p class="intro">This page shows the complete request envelope delivered to the app. EasyAuth-related headers are highlighted so injected identity is easy to verify, and the browser calls <code>/.auth/me</code> to render the signed-in principal and its claims.</p>
+    <header class="page-header">
+      <div>
+        <div class="eyebrow">Embr diagnostic app</div>
+        <h1>EasyAuth request inspector</h1>
+        <p class="intro">This page shows the complete request envelope delivered to the app. EasyAuth-related headers are highlighted so injected identity is easy to verify, and the browser calls <code>/.auth/me</code> to render the signed-in principal and its claims.</p>
+      </div>
+      <a class="logout" href="/.auth/logout">Log out</a>
+    </header>
 
     <section class="summary" aria-label="Request summary">
       <div class="stat"><span class="stat-label">Method</span><span class="stat-value">{escape(request.method)}</span></div>

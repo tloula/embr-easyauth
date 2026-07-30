@@ -117,6 +117,7 @@ def _render_client_principal(raw: str | None) -> tuple[str, str]:
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request) -> HTMLResponse:
     headers = sorted(request.headers.items(), key=lambda item: item[0].lower())
+    cookies = sorted(request.cookies.items(), key=lambda item: item[0].lower())
     easyauth_count = sum(
         name.lower().startswith(_EASYAUTH_HEADER_PREFIXES) for name, _ in headers
     )
@@ -124,6 +125,13 @@ def root(request: Request) -> HTMLResponse:
         f'<tr class="{"identity" if name.lower().startswith(_EASYAUTH_HEADER_PREFIXES) else ""}">'
         f'<th scope="row">{escape(name)}</th><td>{escape(value)}</td></tr>'
         for name, value in headers
+    )
+    cookie_rows = (
+        "".join(
+            f"<tr><th scope=\"row\">{escape(name)}</th><td>{escape(value)}</td></tr>"
+            for name, value in cookies
+        )
+        or '<tr><td colspan="2" class="empty">No cookies received.</td></tr>'
     )
     azure_socket_ip = request.headers.get("x-azure-socketip", "not present")
     principal_status, principal_body = _render_client_principal(
@@ -380,6 +388,18 @@ def root(request: Request) -> HTMLResponse:
 
     <section class="panel">
       <div class="panel-heading">
+        <h2>Cookies received by the app</h2>
+        <span class="status">{len(cookies)} cookie{"s" if len(cookies) != 1 else ""}</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tbody>{cookie_rows}</tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
         <h2>Headers received by the app</h2>
         <span class="status">{identity_status}</span>
       </div>
@@ -538,6 +558,7 @@ def echo_headers(request: Request) -> JSONResponse:
             "method": request.method,
             "path": request.url.path,
             "headers": dict(request.headers),
+            "cookies": dict(request.cookies),
             "client": request.client.host if request.client else None,
             "client_principal": principal,
             "client_principal_error": principal_error,

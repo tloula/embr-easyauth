@@ -21,14 +21,14 @@ uv sync
 uv run uvicorn app.main:app --port 8000
 ```
 
-Open http://localhost:8000 to inspect every header received by the app in a browser. EasyAuth-related identity headers are highlighted for quick verification, the `x-ms-client-principal` header is base64-decoded server-side into a formatted claims table, and the page fetches `/.auth/me` client-side to render the signed-in identity, its provider, and a formatted claims table (with the raw JSON available in a collapsible section). When EasyAuth is not enabled or the caller is unauthenticated, those panels report the missing header or failing status instead. Use `/headers` when a raw JSON response is more convenient for automation.
+Open http://localhost:8000 to inspect every header and cookie received by the app in a browser. EasyAuth-related identity headers are highlighted for quick verification, the `x-ms-client-principal` header is base64-decoded server-side into a formatted claims table, and the page fetches `/.auth/me` client-side to render the signed-in identity, its provider, and a formatted claims table (with the raw JSON available in a collapsible section). When EasyAuth is not enabled or the caller is unauthenticated, those panels report the missing header or failing status instead. Use `/headers` when a raw JSON response is more convenient for automation.
 
 ## Routes
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/` | HTML request inspector showing request metadata, the decoded `x-ms-client-principal`, `/.auth/me` identity, and all received headers |
-| GET/POST/PUT/DELETE | `/headers` | Echoes request method, path, all headers, client host, and the decoded `x-ms-client-principal` as JSON |
+| GET | `/` | HTML request inspector showing request metadata, the decoded `x-ms-client-principal`, `/.auth/me` identity, and all received cookies and headers |
+| GET/POST/PUT/DELETE | `/headers` | Echoes request method, path, all cookies and headers, client host, and the decoded `x-ms-client-principal` as JSON |
 | GET | `/health` | Liveness probe (`{"status":"ok"}`) |
 
 Both flavours expose the same routes. The Functions host sets `routePrefix` to `""` in [functionapp/host.json](functionapp/host.json), so there is no `/api` prefix and the paths match the Embr deployment exactly.

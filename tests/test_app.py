@@ -5,7 +5,7 @@ import unittest
 
 from starlette.requests import Request
 
-from app.main import app, auth_cookies, echo_headers, root
+from app.main import _cookie_entries, app, auth_cookies, echo_headers, root
 
 
 def make_request(path: str = "/", cookie_header: str | None = None) -> Request:
@@ -68,8 +68,38 @@ class CookieInspectorTests(unittest.TestCase):
         payload = json.loads(response.body)
 
         self.assertEqual(
-            {"session": "abc123", "theme": "dark"},
+            [
+                {"name": "session", "value": "abc123"},
+                {"name": "theme", "value": "dark"},
+            ],
             payload["cookies"],
+        )
+
+    def test_duplicate_cookie_names_are_preserved_in_browser_order(self) -> None:
+        request = make_request(
+            "/auth/cookies",
+            "embr_refresh_token=AUTH_PATH_SECRET; "
+            "embr_refresh_token=ROOT_PATH_VALUE; theme=dark",
+        )
+
+        self.assertEqual(
+            [
+                ("embr_refresh_token", "AUTH_PATH_SECRET"),
+                ("embr_refresh_token", "ROOT_PATH_VALUE"),
+                ("theme", "dark"),
+            ],
+            _cookie_entries(request),
+        )
+
+        body = auth_cookies(request).body.decode()
+        self.assertIn(">3 cookies<", body)
+        self.assertIn(
+            "<th scope=\"row\">embr_refresh_token</th><td>AUTH_PATH_SECRET</td>",
+            body,
+        )
+        self.assertIn(
+            "<th scope=\"row\">embr_refresh_token</th><td>ROOT_PATH_VALUE</td>",
+            body,
         )
 
 

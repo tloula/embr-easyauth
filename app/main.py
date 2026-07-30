@@ -114,9 +114,23 @@ def _render_client_principal(raw: str | None) -> tuple[str, str]:
     return "Decoded", body
 
 
+def _cookie_entries(request: Request) -> list[tuple[str, str]]:
+    """Return every Cookie header pair in browser order, preserving duplicate names."""
+    entries: list[tuple[str, str]] = []
+    for header_value in request.headers.getlist("cookie"):
+        for raw_cookie in header_value.split(";"):
+            name, separator, value = raw_cookie.partition("=")
+            normalized_name = name.strip()
+            if normalized_name:
+                entries.append(
+                    (normalized_name, value.strip() if separator else "")
+                )
+    return entries
+
+
 def _render_request_inspector(request: Request) -> HTMLResponse:
     headers = sorted(request.headers.items(), key=lambda item: item[0].lower())
-    cookies = sorted(request.cookies.items(), key=lambda item: item[0].lower())
+    cookies = _cookie_entries(request)
     easyauth_count = sum(
         name.lower().startswith(_EASYAUTH_HEADER_PREFIXES) for name, _ in headers
     )
@@ -572,7 +586,10 @@ def echo_headers(request: Request) -> JSONResponse:
             "method": request.method,
             "path": request.url.path,
             "headers": dict(request.headers),
-            "cookies": dict(request.cookies),
+            "cookies": [
+                {"name": name, "value": value}
+                for name, value in _cookie_entries(request)
+            ],
             "client": request.client.host if request.client else None,
             "client_principal": principal,
             "client_principal_error": principal_error,

@@ -21,7 +21,7 @@ uv sync
 uv run uvicorn app.main:app --port 8000
 ```
 
-Open http://localhost:8000 to inspect every header and cookie received by the app in a browser. EasyAuth-related identity headers are highlighted for quick verification, the `x-ms-client-principal` header is base64-decoded server-side into a formatted claims table, and the page fetches `/.auth/me` client-side to render the signed-in identity, its provider, and a formatted claims table (with the raw JSON available in a collapsible section). When EasyAuth is not enabled or the caller is unauthenticated, those panels report the missing header or failing status instead. Use `/auth` or `/auth/cookies` to exercise the same inspector under the `/auth` path boundary, and use `/headers` when a raw JSON response is more convenient for automation.
+Open http://localhost:8000 to inspect every header and cookie received by the app in a browser. Cookie entries remain in browser order and duplicate names are preserved, which matters when the same cookie name exists at different paths. EasyAuth-related identity headers are highlighted for quick verification, the `x-ms-client-principal` header is base64-decoded server-side into a formatted claims table, and the page fetches `/.auth/me` client-side to render the signed-in identity, its provider, and a formatted claims table (with the raw JSON available in a collapsible section). When EasyAuth is not enabled or the caller is unauthenticated, those panels report the missing header or failing status instead. Use `/auth` or `/auth/cookies` to exercise the same inspector under the `/auth` path boundary, and use `/headers` when a raw JSON response is more convenient for automation.
 
 ## Routes
 

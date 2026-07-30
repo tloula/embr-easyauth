@@ -5,10 +5,10 @@ import unittest
 
 from starlette.requests import Request
 
-from app.main import echo_headers, root
+from app.main import app, auth_cookies, echo_headers, root
 
 
-def make_request(cookie_header: str | None = None) -> Request:
+def make_request(path: str = "/", cookie_header: str | None = None) -> Request:
     headers = []
     if cookie_header is not None:
         headers.append((b"cookie", cookie_header.encode("latin-1")))
@@ -18,8 +18,8 @@ def make_request(cookie_header: str | None = None) -> Request:
             "http_version": "1.1",
             "method": "GET",
             "scheme": "https",
-            "path": "/",
-            "raw_path": b"/",
+            "path": path,
+            "raw_path": path.encode("latin-1"),
             "query_string": b"",
             "root_path": "",
             "headers": headers,
@@ -31,7 +31,7 @@ def make_request(cookie_header: str | None = None) -> Request:
 
 class CookieInspectorTests(unittest.TestCase):
     def test_root_renders_all_parsed_cookies_and_escapes_values(self) -> None:
-        response = root(make_request("session=abc123; theme=dark; unsafe=<b>"))
+        response = root(make_request(cookie_header="session=abc123; theme=dark; unsafe=<b>"))
         body = response.body.decode()
 
         self.assertIn("Cookies received by the app", body)
@@ -46,8 +46,25 @@ class CookieInspectorTests(unittest.TestCase):
         self.assertIn(">0 cookies<", body)
         self.assertIn("No cookies received.", body)
 
+    def test_auth_cookies_renders_the_same_cookie_table(self) -> None:
+        response = auth_cookies(
+            make_request("/auth/cookies", "embr_refresh_token=secret; theme=dark")
+        )
+        body = response.body.decode()
+
+        self.assertIn("Cookies received by the app", body)
+        self.assertIn("<span class=\"stat-value\">/auth/cookies</span>", body)
+        self.assertIn("<th scope=\"row\">embr_refresh_token</th><td>secret</td>", body)
+        self.assertIn("<th scope=\"row\">theme</th><td>dark</td>", body)
+
+    def test_auth_routes_are_registered(self) -> None:
+        paths = {route.path for route in app.routes}
+
+        self.assertIn("/auth", paths)
+        self.assertIn("/auth/cookies", paths)
+
     def test_headers_endpoint_includes_parsed_cookies(self) -> None:
-        response = echo_headers(make_request("session=abc123; theme=dark"))
+        response = echo_headers(make_request(cookie_header="session=abc123; theme=dark"))
         payload = json.loads(response.body)
 
         self.assertEqual(

@@ -21,13 +21,15 @@ uv sync
 uv run uvicorn app.main:app --port 8000
 ```
 
-Open http://localhost:8000 to inspect every header and cookie received by the app in a browser. EasyAuth-related identity headers are highlighted for quick verification, the `x-ms-client-principal` header is base64-decoded server-side into a formatted claims table, and the page fetches `/.auth/me` client-side to render the signed-in identity, its provider, and a formatted claims table (with the raw JSON available in a collapsible section). When EasyAuth is not enabled or the caller is unauthenticated, those panels report the missing header or failing status instead. Use `/headers` when a raw JSON response is more convenient for automation.
+Open http://localhost:8000 to inspect every header and cookie received by the app in a browser. EasyAuth-related identity headers are highlighted for quick verification, the `x-ms-client-principal` header is base64-decoded server-side into a formatted claims table, and the page fetches `/.auth/me` client-side to render the signed-in identity, its provider, and a formatted claims table (with the raw JSON available in a collapsible section). When EasyAuth is not enabled or the caller is unauthenticated, those panels report the missing header or failing status instead. Use `/auth` or `/auth/cookies` to exercise the same inspector under the `/auth` path boundary, and use `/headers` when a raw JSON response is more convenient for automation.
 
 ## Routes
 
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/` | HTML request inspector showing request metadata, the decoded `x-ms-client-principal`, `/.auth/me` identity, and all received cookies and headers |
+| GET | `/auth` | Same inspector page under the `/auth` boundary for testing path-scoped cookies |
+| GET | `/auth/cookies` | Same inspector page under the `/auth` boundary for testing path-scoped cookies |
 | GET/POST/PUT/DELETE | `/headers` | Echoes request method, path, all cookies and headers, client host, and the decoded `x-ms-client-principal` as JSON |
 | GET | `/health` | Liveness probe (`{"status":"ok"}`) |
 
@@ -81,4 +83,6 @@ Flex Consumption always remote-builds from `requirements.txt`, so no `SCM_DO_BUI
 
 ## ⚠ Security warning
 
-The homepage and `/headers` dump **all request headers without redaction**, including any credentials or cookies sent by a client. This is intentional for direct proxy-stripping and EasyAuth injection tests and must **never** run in production or in any environment receiving real user traffic.
+The homepage, `/auth`, `/auth/cookies`, and `/headers` dump **all request headers without redaction**, including any credentials or cookies sent by a client. This is intentional for direct proxy-stripping and EasyAuth injection tests and must **never** run in production or in any environment receiving real user traffic.
+
+Use this app only for private boundary testing: `/` can reveal a domain-scoped `embr_access_token`, while `/auth/cookies` can reveal `embr_refresh_token` when its cookie `Path` is `/auth`. `HttpOnly` blocks browser JavaScript from reading cookies, but it does not stop a browser from sending them to an attacker-controlled server.

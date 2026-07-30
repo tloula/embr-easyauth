@@ -114,8 +114,7 @@ def _render_client_principal(raw: str | None) -> tuple[str, str]:
     return "Decoded", body
 
 
-@app.get("/", response_class=HTMLResponse)
-def root(request: Request) -> HTMLResponse:
+def _render_request_inspector(request: Request) -> HTMLResponse:
     headers = sorted(request.headers.items(), key=lambda item: item[0].lower())
     cookies = sorted(request.cookies.items(), key=lambda item: item[0].lower())
     easyauth_count = sum(
@@ -546,6 +545,21 @@ def root(request: Request) -> HTMLResponse:
 </body>
 </html>"""
     return HTMLResponse(html)
+
+
+@app.get("/", response_class=HTMLResponse)
+def root(request: Request) -> HTMLResponse:
+    return _render_request_inspector(request)
+
+
+@app.get("/auth", response_class=HTMLResponse)
+def auth_root(request: Request) -> HTMLResponse:
+    return _render_request_inspector(request)
+
+
+@app.get("/auth/cookies", response_class=HTMLResponse)
+def auth_cookies(request: Request) -> HTMLResponse:
+    return _render_request_inspector(request)
 
 
 @app.api_route("/headers", methods=["GET", "POST", "PUT", "DELETE"])

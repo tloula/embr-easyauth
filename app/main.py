@@ -19,6 +19,11 @@ _EASYAUTH_HEADER_PREFIXES = (
     "x-embr-",
     "x-adc-",
 )
+_PLATFORM_COOKIE_NAMES = {
+    "embr_access_token",
+    "embr_refresh_token",
+}
+_COLLAPSED_VALUE_LENGTH = 160
 
 
 def decode_client_principal(raw: str | None) -> tuple[dict[str, Any] | None, str | None]:
@@ -128,6 +133,18 @@ def _cookie_entries(request: Request) -> list[tuple[str, str]]:
     return entries
 
 
+def _render_table_value(value: str) -> str:
+    encoded = escape(value)
+    if len(value) <= _COLLAPSED_VALUE_LENGTH:
+        return encoded
+    return (
+        '<details class="value-details">'
+        f"<summary>Show value ({len(value)} characters)</summary>"
+        f'<div class="long-value">{encoded}</div>'
+        "</details>"
+    )
+
+
 def _render_request_inspector(request: Request) -> HTMLResponse:
     headers = sorted(request.headers.items(), key=lambda item: item[0].lower())
     cookies = _cookie_entries(request)
@@ -136,12 +153,13 @@ def _render_request_inspector(request: Request) -> HTMLResponse:
     )
     rows = "".join(
         f'<tr class="{"identity" if name.lower().startswith(_EASYAUTH_HEADER_PREFIXES) else ""}">'
-        f'<th scope="row">{escape(name)}</th><td>{escape(value)}</td></tr>'
+        f'<th scope="row">{escape(name)}</th><td>{_render_table_value(value)}</td></tr>'
         for name, value in headers
     )
     cookie_rows = (
         "".join(
-            f"<tr><th scope=\"row\">{escape(name)}</th><td>{escape(value)}</td></tr>"
+            f'<tr class="{"platform-cookie" if name.lower() in _PLATFORM_COOKIE_NAMES else ""}">'
+            f'<th scope="row">{escape(name)}</th><td>{_render_table_value(value)}</td></tr>'
             for name, value in cookies
         )
         or '<tr><td colspan="2" class="empty">No cookies received.</td></tr>'
@@ -331,6 +349,15 @@ def _render_request_inspector(request: Request) -> HTMLResponse:
     tr:last-child th, tr:last-child td {{ border-bottom: 0; }}
     tr.identity {{ background: #effaf5; }}
     tr.identity th {{ color: var(--signal); }}
+    tr.platform-cookie {{ background: #fff0f0; }}
+    tr.platform-cookie th {{ color: #b42318; }}
+    details.value-details summary {{
+      cursor: pointer;
+      color: var(--azure);
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      font-weight: 700;
+    }}
+    .long-value {{ margin-top: 8px; overflow-wrap: anywhere; }}
     .footer {{
       display: flex;
       justify-content: space-between;

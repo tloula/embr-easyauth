@@ -8,10 +8,16 @@ from starlette.requests import Request
 from app.main import _cookie_entries, app, auth_cookies, echo_headers, root
 
 
-def make_request(path: str = "/", cookie_header: str | None = None) -> Request:
+def make_request(
+    path: str = "/",
+    cookie_header: str | None = None,
+    extra_headers: list[tuple[bytes, bytes]] | None = None,
+) -> Request:
     headers = []
     if cookie_header is not None:
         headers.append((b"cookie", cookie_header.encode("latin-1")))
+    if extra_headers is not None:
+        headers.extend(extra_headers)
     return Request(
         {
             "type": "http",
@@ -54,7 +60,10 @@ class CookieInspectorTests(unittest.TestCase):
 
         self.assertIn("Cookies received by the app", body)
         self.assertIn("<span class=\"stat-value\">/auth/cookies</span>", body)
-        self.assertIn("<th scope=\"row\">embr_refresh_token</th><td>secret</td>", body)
+        self.assertIn(
+            '<tr class="platform-cookie"><th scope="row">embr_refresh_token</th><td>secret</td>',
+            body,
+        )
         self.assertIn("<th scope=\"row\">theme</th><td>dark</td>", body)
 
     def test_auth_routes_are_registered(self) -> None:
@@ -94,13 +103,38 @@ class CookieInspectorTests(unittest.TestCase):
         body = auth_cookies(request).body.decode()
         self.assertIn(">3 cookies<", body)
         self.assertIn(
-            "<th scope=\"row\">embr_refresh_token</th><td>AUTH_PATH_SECRET</td>",
+            '<tr class="platform-cookie"><th scope="row">embr_refresh_token</th><td>AUTH_PATH_SECRET</td>',
             body,
         )
         self.assertIn(
-            "<th scope=\"row\">embr_refresh_token</th><td>ROOT_PATH_VALUE</td>",
+            '<tr class="platform-cookie"><th scope="row">embr_refresh_token</th><td>ROOT_PATH_VALUE</td>',
             body,
         )
+
+    def test_platform_access_and_refresh_cookies_are_highlighted(self) -> None:
+        body = root(
+            make_request(
+                cookie_header="embr_access_token=access; embr_refresh_token=refresh"
+            )
+        ).body.decode()
+
+        self.assertEqual(2, body.count('class="platform-cookie"'))
+        self.assertIn("tr.platform-cookie { background: #fff0f0; }", body)
+        self.assertIn("tr.platform-cookie th { color: #b42318; }", body)
+
+    def test_long_cookie_and_header_values_are_collapsed_by_default(self) -> None:
+        long_value = "x" * 200
+        body = root(
+            make_request(
+                cookie_header=f"embr_access_token={long_value}",
+                extra_headers=[(b"x-long-diagnostic", long_value.encode("ascii"))],
+            )
+        ).body.decode()
+
+        self.assertEqual(3, body.count('<details class="value-details">'))
+        self.assertIn("Show value (200 characters)", body)
+        self.assertIn("Show value (218 characters)", body)
+        self.assertNotIn('<details class="value-details" open>', body)
 
 
 if __name__ == "__main__":

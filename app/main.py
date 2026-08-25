@@ -1,5 +1,3 @@
-# TEST-ONLY app: intentionally echoes all headers and must not run in production.
-
 from __future__ import annotations
 
 import base64

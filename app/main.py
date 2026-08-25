@@ -180,7 +180,7 @@ def _render_request_inspector(request: Request) -> HTMLResponse:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EasyAuth request inspector</title>
+  <title>EasyAuth Request Inspector</title>
   <style>
     :root {{
       color-scheme: light;

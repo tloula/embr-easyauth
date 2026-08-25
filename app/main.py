@@ -1,4 +1,4 @@
-# Embr EasyAuth Diagnostic App
+# Embr EasyAuth Diagnostic App test
 
 from __future__ import annotations
 

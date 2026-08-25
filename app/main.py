@@ -1,3 +1,5 @@
+# Embr EasyAuth Diagnostic App
+
 from __future__ import annotations
 
 import base64

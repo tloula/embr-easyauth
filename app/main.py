@@ -193,7 +193,7 @@ def _render_request_inspector(request: Request) -> HTMLResponse:
         )
         or '<tr><td colspan="2" class="empty">No cookies received.</td></tr>'
     )
-    azure_socket_ip = request.headers.get("x-azure-socketip", "not present")
+    forwarded_for = request.headers.get("x-forwarded-for", "not present")
     principal_status, principal_tone, principal_body = _render_client_principal(
         request.headers.get("x-ms-client-principal")
     )
@@ -259,7 +259,7 @@ def _render_request_inspector(request: Request) -> HTMLResponse:
         <dl class="config">
           <div><dt>Method</dt><dd>{escape(request.method)}</dd></div>
           <div><dt>Path</dt><dd>{escape(request.url.path)}</dd></div>
-          <div><dt>X-Azure-SocketIP</dt><dd>{escape(azure_socket_ip)}</dd></div>
+          <div><dt>X-Forwarded-For</dt><dd>{escape(forwarded_for)}</dd></div>
           <div><dt>Headers</dt><dd>{len(headers)}</dd></div>
         </dl>
       </section>

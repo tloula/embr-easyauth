@@ -59,7 +59,7 @@ class CookieInspectorTests(unittest.TestCase):
         body = response.body.decode()
 
         self.assertIn("Cookies received by the app", body)
-        self.assertIn("<span class=\"stat-value\">/auth/cookies</span>", body)
+        self.assertIn("<dd>/auth/cookies</dd>", body)
         self.assertIn(
             '<tr class="platform-cookie"><th scope="row">embr_refresh_token</th><td>secret</td>',
             body,
@@ -119,8 +119,8 @@ class CookieInspectorTests(unittest.TestCase):
         ).body.decode()
 
         self.assertEqual(2, body.count('class="platform-cookie"'))
-        self.assertIn("tr.platform-cookie { background: #fff0f0; }", body)
-        self.assertIn("tr.platform-cookie th { color: #b42318; }", body)
+        self.assertIn("tr.platform-cookie { background: #211111; }", body)
+        self.assertIn("tr.platform-cookie th { color: var(--red); }", body)
 
     def test_long_cookie_and_header_values_are_collapsed_by_default(self) -> None:
         long_value = "x" * 200
